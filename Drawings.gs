@@ -35,3 +35,20 @@ function drawingList_(b,email){
  if(scan.current||scan.queue.length){const data=JSON.stringify(scan);if(Utilities.newBlob(data).getBytes().length>90000)throw Error('Folder structure is too large. Use a smaller drawings root.');cursor=Utilities.getUuid();cache.put('DRAWINGS_SCAN_'+cursor,data,600);}
  return {files,cursor};
 }
+
+/** Read only a non-trashed file under the configured root after portal auth. */
+function drawingFile_(b,email){
+ const root=props_().getProperty('DRAWINGS_FOLDER_ID');
+ if(!root)throw Error('Drawings folder is not configured.');
+ const id=id_(b.id),file=DriveApp.getFileById(id);
+ if(file.isTrashed()||file.getMimeType()==='application/vnd.google-apps.shortcut')throw Error('Drawing is unavailable.');
+ let found=false,visited={},queue=[],parents=file.getParents();
+ while(parents.hasNext())queue.push(parents.next());
+ let checked=0;
+ while(queue.length&&checked++<200){const folder=queue.shift(),fid=folder.getId();if(visited[fid])continue;visited[fid]=true;if(folder.isTrashed())continue;if(fid===root){found=true;break;}const ancestors=folder.getParents();while(ancestors.hasNext())queue.push(ancestors.next());}
+ if(!found)throw Error('This file is outside the configured drawing library.');
+ if(file.getSize()>20*1024*1024)throw Error('This drawing exceeds the 20 MB portal limit. Ask the administrator for a smaller viewing copy.');
+ if(file.getMimeType().indexOf('application/vnd.google-apps.')===0)throw Error('Export this drawing as a PDF or image before viewing it in the portal.');
+ const bytes=file.getBlob().getBytes();if(bytes.length>20*1024*1024)throw Error('This drawing exceeds the 20 MB portal limit.');
+ return {name:file.getName(),type:file.getMimeType(),base64:Utilities.base64Encode(bytes)};
+}
