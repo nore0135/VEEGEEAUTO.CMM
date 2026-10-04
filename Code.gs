@@ -53,6 +53,7 @@ function deleteRecords_(job,docs,email,deleteJob){
 }
 function dispatch_(b,email,c){
  if(b.action==='drawingList')return drawingList_(b,email);
+ if(b.action==='drawingFile')return drawingFile_(b,email);
  if(b.action==='state')return state_(email,c);
  if(b.action==='request'){
   const id=id_(b.id);const existing=rows_('jobs',true).find(x=>x.id===id);if(existing){if(existing.deletedAt)throw Error('This request was deleted. Create a new request.');if(existing.requester!==email)throw Error('Duplicate ID.');return {id};}
