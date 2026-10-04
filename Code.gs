@@ -37,6 +37,20 @@ function json_(v){return ContentService.createTextOutput(JSON.stringify(v)).setM
 function quantity_(v){const n=Number(v);if(!Number.isInteger(n)||n<1||n>10000)throw Error('Quantity must be between 1 and 10000.');return n;}
 function version_(record,version){if((record.version||1)!==Number(version))throw Error('Another administrator changed this record. Refresh before trying again.');}
 function protectLastReport_(doc){if(!doc.jobId)return;const job=rows_('jobs').find(j=>j.id===doc.jobId);if(job&&job.status==='Completed'&&!rows_('documents').some(d=>d.id!==doc.id&&d.jobId===doc.jobId&&d.kind==='Inspection report'))throw Error('This is the only report for a completed inspection. Change the inspection to In progress before deleting or moving its report.');}
+function deleteRecords_(job,docs,email,deleteJob){
+ const stamp=new Date().toISOString(),written=[],files=[];
+ const mark=r=>({...r,deletedAt:stamp,deletedBy:email,version:(r.version||1)+1});
+ try{
+  for(const d of docs){const file=DriveApp.getFileById(d.fileId);files.push(file);file.setTrashed(true);written.push(['documents',d]);put_('documents',mark(d));}
+  if(job){written.push(['jobs',job]);put_('jobs',deleteJob?mark(job):{...job,status:'In progress',completed:null,updated:stamp,updatedBy:email,version:(job.version||1)+1});}
+ }catch(e){
+  let rollbackFailed=false;
+  for(const [table,record] of written.reverse()){try{put_(table,record);}catch(err){rollbackFailed=true;console.error(String(err));}}
+  for(const file of files){try{file.setTrashed(false);}catch(err){rollbackFailed=true;console.error(String(err));}}
+  if(rollbackFailed)throw Error('Deletion could not finish and recovery was incomplete. Ask the owner to check the database and Drive Trash before retrying.');
+  throw e;
+ }
+}
 function dispatch_(b,email,c){
  if(b.action==='state')return state_(email,c);
  if(b.action==='request'){
@@ -49,14 +63,16 @@ function dispatch_(b,email,c){
  admin_(email,c);
  if(b.action==='deleteRequest'){
   const job=rows_('jobs').find(j=>j.id===id_(b.id));if(!job)throw Error('Request not found.');version_(job,b.version);
-  if(rows_('documents').some(d=>d.jobId===job.id))throw Error('Delete or move the attached reports before deleting this request.');
-  put_('jobs',{...job,deletedAt:new Date().toISOString(),deletedBy:email,version:(job.version||1)+1});return {deleted:true};
+  const docs=rows_('documents').filter(d=>d.jobId===job.id);
+  const signature=a=>JSON.stringify(a.map(d=>[d.id,d.version||1]).sort((a,b)=>a[0].localeCompare(b[0])));
+  if(signature(docs)!==signature(Array.isArray(b.reports)?b.reports:[]))throw Error('Attached reports have changed. Refresh and confirm deletion again.');
+  deleteRecords_(job,docs,email,true);return {deleted:true};
  }
  if(b.action==='deleteDocument'){
-  const doc=rows_('documents').find(d=>d.id===id_(b.id));if(!doc)throw Error('Document not found.');version_(doc,b.version);protectLastReport_(doc);
-  const file=DriveApp.getFileById(doc.fileId);file.setTrashed(true);
-  try{put_('documents',{...doc,deletedAt:new Date().toISOString(),deletedBy:email,version:(doc.version||1)+1});}catch(e){file.setTrashed(false);throw e;}
-  return {deleted:true};
+  const doc=rows_('documents').find(d=>d.id===id_(b.id));if(!doc)throw Error('Document not found.');version_(doc,b.version);
+  const job=doc.jobId?rows_('jobs').find(j=>j.id===doc.jobId):null;
+  const reopen=job&&job.status==='Completed'&&!rows_('documents').some(d=>d.id!==doc.id&&d.jobId===job.id&&d.kind==='Inspection report');
+  deleteRecords_(reopen?job:null,[doc],email,false);return {deleted:true,reopened:!!reopen};
  }
  if(b.action==='editDocument'){
   const doc=rows_('documents').find(d=>d.id===id_(b.id));if(!doc)throw Error('Document not found.');version_(doc,b.version);
