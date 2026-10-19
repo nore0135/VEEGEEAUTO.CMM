@@ -7,8 +7,9 @@ async function pdfjs(){if(!pdfLibrary)pdfLibrary=import('https://cdnjs.cloudflar
 async function utif(){if(!tiffLibrary)tiffLibrary=script('https://cdn.jsdelivr.net/npm/pako@1.0.11/dist/pako.min.js').then(()=>script('https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.js')).then(()=>window.UTIF).catch(e=>{tiffLibrary=null;throw e;});return tiffLibrary;}
 function close(){epoch++;if(active){active.dead=true;active.task?.cancel();active.pdf?.destroy();active.observer?.disconnect();cancelAnimationFrame(active.tiffFrame);cancelAnimationFrame(active.zoomFrame);clearTimeout(active.detailTimer);clearTimeout(active.timer);if(active.url)URL.revokeObjectURL(active.url);active=null;}}
 function clear(){close();cached=null;}
-async function mount(host,doc,fetchFile){
- close();const ticket=epoch,v={host,doc,dead:false,scale:1,page:1,pages:1,width:0,height:0,rotation:0,pointers:new Map()};active=v;
+async function mount(host,doc,fetchFile,saved){
+ if(saved?.id!==doc.id)saved=null;
+ close();const ticket=epoch,v={host,doc,dead:false,scale:1,page:1,pages:1,width:0,height:0,rotation:0,pointers:new Map()};active=v;if(saved&&[0,90,180,270].includes(saved.rotation))v.rotation=saved.rotation;
  const valid=()=>!v.dead&&ticket===epoch&&host.isConnected;
  host.innerHTML='<div class="dv-toolbar" role="toolbar" aria-label="Drawing viewer controls"><button data-dv="minus" aria-label="Zoom out" title="Zoom out (−)">−</button><output data-dv-percent>100%</output><button data-dv="plus" aria-label="Zoom in" title="Zoom in (+)">+</button><span class="dv-separator"></span><button data-dv="fit">Fit</button><button data-dv="actual">100%</button><button data-dv="rotate" aria-label="Rotate drawing clockwise">Rotate ↻</button><button data-dv="full">Full screen</button><span class="dv-pages"><button data-dv="previous" aria-label="Previous page">‹</button><output data-dv-page>1 / 1</output><button data-dv="next" aria-label="Next page">›</button></span><button data-dv="download" class="dv-download">Download ↓</button></div><p class="dv-status" role="status">Loading drawing…</p><div class="dv-stage" tabindex="0" aria-label="Drawing canvas. Scroll to zoom, drag to pan. Plus and minus zoom; zero fits the drawing."><div class="dv-sheet"></div></div><p class="dv-hint">Wheel / pinch to zoom<span class="dv-hint-dot">·</span>Drag to explore<span class="dv-hint-dot">·</span>Double-click to fit<span class="dv-quality">PRECISION VIEW</span></p>';
  const q=s=>host.querySelector(s),stage=q('.dv-stage'),sheet=q('.dv-sheet'),status=q('.dv-status');v.stage=stage;v.sheet=sheet;
@@ -65,12 +66,15 @@ async function mount(host,doc,fetchFile){
  v.observer=new ResizeObserver(()=>{if(valid()&&v.width)layout();});v.observer.observe(stage);
  try{let data=cached?.id===doc.id?cached.data:await fetchFile(doc.id);if(!valid())return;cached={id:doc.id,data};v.bytes=Uint8Array.from(atob(data.base64),c=>c.charCodeAt(0));v.type=data.type;q('[data-dv="download"]').disabled=false;
  const pdf=v.type==='application/pdf'||/\.pdf$/i.test(doc.name),tiff=v.type==='image/tiff'||/\.tiff?$/i.test(doc.name);
- if(pdf){const lib=await pdfjs();if(!valid())return;const task=lib.getDocument({data:v.bytes.slice(),isEvalSupported:false});v.pdf=await task.promise;if(!valid()){v.pdf.destroy();return;}v.pages=v.pdf.numPages;await page(1);}
- else if(tiff){v.tiff=await utif();if(!valid())return;v.ifds=v.tiff.decode(v.bytes.buffer).filter(d=>d.t256&&d.t257);v.pages=v.ifds.length;if(!v.pages)throw Error('No image pages found in this TIFF.');await page(1);}
+ if(pdf){const lib=await pdfjs();if(!valid())return;const task=lib.getDocument({data:v.bytes.slice(),isEvalSupported:false});v.pdf=await task.promise;if(!valid()){v.pdf.destroy();return;}v.pages=v.pdf.numPages;await page(Number.isInteger(saved?.page)?clamp(saved.page,1,v.pages):1);}
+ else if(tiff){v.tiff=await utif();if(!valid())return;v.ifds=v.tiff.decode(v.bytes.buffer).filter(d=>d.t256&&d.t257);v.pages=v.ifds.length;if(!v.pages)throw Error('No image pages found in this TIFF.');await page(Number.isInteger(saved?.page)?clamp(saved.page,1,v.pages):1);}
  else if(/^image\/(png|jpeg|webp|gif|bmp)$/.test(v.type)){v.url=URL.createObjectURL(new Blob([v.bytes],{type:v.type}));const img=new Image();img.src=v.url;await img.decode();if(!valid())return;v.width=img.naturalWidth;v.height=img.naturalHeight;v.canvas=img;img.alt=doc.name;img.draggable=false;sheet.replaceChildren(img);fit();say('Ready');}
  else say('Preview supports PDF, TIFF, PNG, JPG, WebP, GIF and BMP. Download this format to use its original application.');
+ if(valid()&&saved&&Number.isFinite(saved.scale)){zoomNow(saved.scale);stage.scrollLeft=Number.isFinite(saved.left)?saved.left:0;stage.scrollTop=Number.isFinite(saved.top)?saved.top:0;}
  }catch(e){say('Unable to display drawing: '+e.message);}labels();
 }
-window.CMM_DRAWING_VIEWER={mount,close,clear};
+function snapshot(){const v=active;return v&&!v.dead&&v.width?{id:v.doc.id,page:v.page,scale:v.scale,rotation:v.rotation,left:v.stage.scrollLeft,top:v.stage.scrollTop}:null;}
+window.CMM_DRAWING_VIEWER={mount,close,clear,snapshot};
 })();
+
 
