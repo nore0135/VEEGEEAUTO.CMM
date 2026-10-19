@@ -65,3 +65,51 @@ dialog{border-radius:17px;box-shadow:0 30px 100px #102a4b40}dialog[open]{animati
 @media(max-width:850px){.app-shell .page-heading{padding:23px;min-height:0}.app-shell .page-heading h1{font-size:26px}.app-shell .metric b{font-size:33px}.app-shell .topbar{flex-wrap:wrap;padding:12px 18px;gap:9px}.app-shell .topright{margin-left:auto}.app-shell .breadcrumb>span{display:none}}
 @media(max-width:620px){.app-shell .topbar{position:relative;padding:12px 15px}.app-shell .sidebar{z-index:30}.app-shell .page-heading{border-radius:14px;padding:22px}.app-shell .page-heading h1{font-size:25px}.app-shell .metric{padding:15px}.app-shell .metric-icon{width:28px;height:28px;border-radius:9px}.app-shell .metric-grid{gap:10px}.app-shell .metric-label{font-size:11px}.app-shell .topright .btn{font-size:11px;padding:6px 8px}.app-shell .time{padding-left:7px;font-size:11px}.app-shell .page-heading .actions{width:100%}.app-shell .page-heading .btn{font-size:12px}}
 @media(prefers-reduced-motion:reduce){.app-shell *,.app-shell *:before,.app-shell *:after,dialog[open]{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* Staff motion system: finite entrances and tactile feedback, no idle loops. */
+.app-shell{--motion-ease:cubic-bezier(.2,.75,.25,1)}
+@media(prefers-reduced-motion:no-preference){
+ .app-shell .view-enter .page-heading{animation:staff-rise .46s var(--motion-ease) backwards}
+ .app-shell .view-enter .page-heading:after{animation:staff-orbit .9s var(--motion-ease) backwards}
+ .app-shell .view-enter .metric{animation:staff-rise .5s var(--motion-ease) backwards}
+ .app-shell .view-enter .metric:nth-child(2){animation-delay:60ms}
+ .app-shell .view-enter .metric:nth-child(3){animation-delay:120ms}
+ .app-shell .view-enter .metric:nth-child(4){animation-delay:180ms}
+ .app-shell .view-enter .metric:after{transform-origin:left;animation:staff-line .65s .2s var(--motion-ease) backwards}
+ .app-shell .view-enter>.panel,.app-shell .view-enter>.dashboard-grid,.app-shell .view-enter>.report-grid,.app-shell .view-enter>.drawings-layout,.app-shell .view-enter>.settings-grid{animation:staff-rise .5s .1s var(--motion-ease) backwards}
+ .app-shell .view-enter .report-card{animation:staff-rise .42s var(--motion-ease) backwards}
+ .app-shell .view-enter .report-card:nth-child(2){animation-delay:50ms}
+ .app-shell .view-enter .report-card:nth-child(3){animation-delay:100ms}
+ .app-shell .view-enter .report-card:nth-child(n+4){animation-delay:150ms}
+ .app-shell .view-enter .bar{animation:workspace-bar .75s .16s var(--motion-ease) backwards}
+ .app-shell .nav button svg,.app-shell .btn svg,.app-shell .metric-icon,.app-shell .report-card .file-icon{transition:transform .24s var(--motion-ease)}
+ .app-shell .nav button:active{transform:translateX(2px) scale(.98)}
+ .app-shell .nav button:focus-visible svg{transform:translateX(2px)}
+ .app-shell .line-menu button,.app-shell .tabs button,.app-shell .drawing-result{transition:background .2s,border-color .2s,box-shadow .2s,transform .2s var(--motion-ease)}
+ .app-shell .line-menu button:active,.app-shell .tabs button:active{transform:scale(.96)}
+ .app-shell .drawing-result:active{background:#dceaff}
+ .app-shell .header-menu[open] .header-dropdown{transform-origin:top right;animation:staff-menu .2s var(--motion-ease)}
+ body:has(.app-shell) dialog[open]{animation:staff-dialog .3s cubic-bezier(.16,1,.3,1)}
+ body:has(.app-shell) dialog[open]::backdrop{animation:staff-backdrop .24s ease-out}
+ body:has(.app-shell) dialog[open] .modal-body{animation:staff-rise .32s .06s var(--motion-ease,cubic-bezier(.2,.75,.25,1)) backwards}
+ body:has(.app-shell) dialog .btn{transition:transform .16s,box-shadow .16s,background .16s}
+ body:has(.app-shell) dialog .btn:active{transform:scale(.98)}
+}
+@media(hover:hover) and (pointer:fine) and (prefers-reduced-motion:no-preference){
+ .app-shell .nav button:hover svg{transform:translateX(2px) scale(1.08)}
+ .app-shell .btn:hover:not(:disabled) svg{transform:translateY(-1px)}
+ .app-shell .metric:hover .metric-icon{transform:translateY(-2px) rotate(-5deg)}
+ .app-shell .report-card:hover .file-icon{transform:rotate(-5deg) scale(1.04)}
+ .app-shell .line-menu button:hover{transform:translateY(-2px)}
+ body:has(.app-shell) dialog .btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 5px 14px #193b6218}
+}
+@keyframes staff-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes staff-line{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes staff-orbit{from{opacity:0;transform:translateX(35px) rotate(-18deg)}to{opacity:1;transform:none}}
+@keyframes staff-dialog{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes staff-backdrop{from{opacity:0}to{opacity:1}}
+@keyframes staff-menu{from{opacity:0;transform:translateY(-5px) scale(.97)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){
+ body:has(.app-shell) dialog *,body:has(.app-shell) dialog::backdrop{animation:none!important;transition:none!important}
+ .app-shell .metric:hover,.app-shell .report-card:hover,.app-shell .nav button:hover,.app-shell .btn:hover,.app-shell .icon-btn:hover{transform:none}
+}
